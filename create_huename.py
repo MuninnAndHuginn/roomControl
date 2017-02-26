@@ -3,7 +3,7 @@ import argparse
 import configobj
 from qhue import create_new_username
 
-parser = argparse.ArgumentParser(description='Create a new Philips HUE User Login and create/update ./huename.py for use in the application.')
+parser = argparse.ArgumentParser(description='Create a new Philips HUE User Login and create/update ./huename.conf for use in the application.')
 parser.add_argument('hueip', metavar='IP', type=str, help='The HUE Bridge IP Address.')
 args = parser.parse_args()
 
