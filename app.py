@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!flask/bin/python
 from qhueroom import *
 import json
 from flask import Flask, render_template, session, request
