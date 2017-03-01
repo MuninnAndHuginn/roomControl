@@ -39,5 +39,8 @@
         <p>Async mode is: <b>{{ async_mode }}</b></p>
         <p>Average ping/pong latency: <b><span id="ping-pong"></span>ms</b></p>
     </div>
+
+    <!-- Attach React components -->
+    <script type="text/javascript" src="{{ url_for('static', filename='bundle.js') }}"></script>
 </body>
 </html>

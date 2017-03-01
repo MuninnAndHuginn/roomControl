@@ -1,3 +1,6 @@
 flask/
+node/
+node_modules/
 __pycache__/
+static/bundle.js
 huename.conf

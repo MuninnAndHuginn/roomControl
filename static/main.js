@@ -13,7 +13,7 @@ $(function() {
         swipe:function(event, direction, distance, duration, fingerCount, fingerData) {
 			var active = $( "#tabs" ).tabs( "option", "active" );
 			var maxIdx = $( '#tabs >ul >li' ).length - 1;
-			if (direction == "left") {
+			if (direction == "right") {
 				if (active == 0) {
 					$( "#tabs" ).tabs( "option", "active", maxIdx );
 				}
@@ -21,7 +21,7 @@ $(function() {
 					$( "#tabs" ).tabs( "option", "active", active-1 );
 				}
 			}
-			else if (direction == "right") {
+			else if (direction == "left") {
 				if (active == maxIdx) {
 					$( "#tabs" ).tabs( "option", "active", 0);
 				}
