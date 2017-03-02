@@ -14,16 +14,14 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, async_mode=async_mode)
 thread = None
 
-def background_thread():
+def light_poller_thread():
     """Example of how to send server generated events to clients."""
-    count = 0
     while True:
         socketio.sleep(5)
-        count += 1
         lights, groups = Lights()
-        socketio.emit('my_response',
-                      {'data': {'event':'HUE', 'lights':lights, 'groups':groups}, 'count': count},
-                      namespace='/test')
+        socketio.emit('event',
+                      {'id': 'HUE', 'data': {'lights':lights, 'groups':groups}},
+                      namespace='/lights')
 
 
 @app.route('/')
@@ -31,24 +29,31 @@ def index():
     return render_template('index.html', async_mode=socketio.async_mode)
 
 
-
-@socketio.on('my_ping', namespace='/test')
+@socketio.on('my_ping', namespace='/main')
 def ping_pong():
     emit('my_pong')
 
 
-@socketio.on('connect', namespace='/test')
-def test_connect():
+@socketio.on('connect', namespace='/main')
+def main_connect():
+    print('Client conected to /main', request.sid)
+
+@socketio.on('connect', namespace='/lights')
+def lights_connect():
+    print('Client connected to /lights', request.sid)
     global thread
     if thread is None:
-        thread = socketio.start_background_task(target=background_thread)
-    emit('my_response', {'data': 'Connected', 'count': 0})
+        thread = socketio.start_background_task(target=light_poller_thread)
 
 
-@socketio.on('disconnect', namespace='/test')
-def test_disconnect():
-    print('Client disconnected', request.sid)
+@socketio.on('disconnect', namespace='/main')
+def disconnect():
+    print('Client disconnected from /main', request.sid)
 
+@socketio.on('disconnect', namespace='/lights')
+def lights_disconnect():
+    print('Client disconnected from /lights', request.sid)
+        
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
