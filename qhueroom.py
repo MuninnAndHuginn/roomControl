@@ -1,3 +1,4 @@
+import sys
 import configobj
 import json
 from qhue import Bridge, QhueException
@@ -9,9 +10,13 @@ conf = configobj.ConfigObj('huename.conf', raise_errors=True,
     encoding=ENCODING,         # used to read/write file
     default_encoding=ENCODING) # str -> unicode internally (useful on Python2.x)
 
-QHUE_BRIDGE_IP=conf['bridgeip']
-QHUE_USERNAME=conf['username']
-QHUE_GROUPS=conf['groups']
+try:
+    QHUE_BRIDGE_IP=conf['bridgeip']
+    QHUE_USERNAME=conf['username']
+    QHUE_GROUPS=conf['groups']
+except:
+    print("Problem reading config, expected: 'bridgeip: <string>', 'username: <string>', 'groups: <string>[ <string>...]");
+    sys.exit()
 
 QHUE_BRIDGE=None
 def HueBridge():
