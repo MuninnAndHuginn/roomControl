@@ -8,7 +8,7 @@ parser.add_argument('hueip', metavar='IP', type=str, help='The HUE Bridge IP Add
 args = parser.parse_args()
 
 ip=args.hueip
-username = "fake" #create_new_username(ip)
+username = create_new_username(ip)
 
 print("You have successfully created new user %s on HUE Bridge @ %s" %(username, ip))
 
