@@ -17,11 +17,14 @@ thread = None
 def light_poller_thread():
     """Example of how to send server generated events to clients."""
     while True:
-        socketio.sleep(5)
-        lights, groups = Lights()
-        socketio.emit('event',
-                      {'id': 'HUE', 'data': {'lights':lights, 'groups':groups}},
-                      namespace='/lights')
+        socketio.sleep(3)
+        try:
+            lights, groups = Lights()
+            socketio.emit('event',
+                          {'id': 'HUE', 'data': {'lights':lights, 'groups':groups}},
+                          namespace='/lights')
+        except:
+            print("Problem handling light poll... trying again.")
 
 
 @app.route('/')
@@ -44,6 +47,15 @@ def lights_connect():
     global thread
     if thread is None:
         thread = socketio.start_background_task(target=light_poller_thread)
+
+@socketio.on('group_click', namespace='/lights')
+def light_group_click(msg):
+    group_id = msg['id']
+    group_state = msg['on']
+    print('Client toggled light group %s to %s'%(group_id, group_state))
+    group = getGroupById(group_id)
+    group = groupAction(group, {'on': group_state})
+    emit('group_update', group, namespace='/lights')
 
 
 @socketio.on('disconnect', namespace='/main')

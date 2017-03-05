@@ -131,7 +131,7 @@ def updateGroupAction(group):
     To prevent exceptions, strip 'colormode' from the action."""
     
     b = HueBridge()
-    badItems = ['colormode']
+    badItems = ['colormode', 'color']
 
     b = HueBridge()
     action = group.get('action')
