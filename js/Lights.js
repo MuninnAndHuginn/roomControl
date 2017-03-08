@@ -3,6 +3,69 @@ import React from 'react';
 // Connect to the lights namespace of the backend.
 var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/lights');
 
+class LightsBackend {
+   
+    constructor(socket) {
+        this.groupCallbacks = {};
+        this.fullUpdateCallback = null;
+
+        socket.on('group_update', this.handleGroupUpdate)
+        socket.on('event', this.handleEvent)
+        socket.on('connect', this.connected);
+        socket.on('disconnect', this.disconnected);
+    }
+   
+    connected() {
+        console.log("Connected to lights backend!");
+    }
+
+    disconnected() {
+        console.log("Disconnected from lights backend!");
+    }
+
+
+    registerGroupCallback(id, fn) {
+        this.groupCallbacks[id] = fn;
+    }
+
+    registerFullUpdateCallback(fn) {
+        this.fullUpdateCallback = fn;
+    }
+
+    processGroupsUpdate(groups) {
+        for (let group of groups) {
+            if (this.groupCallbacks[group.id]) {
+                this.groupCallbacks[group.id](group);
+            }
+        }
+    }
+
+    processFullUpdate(groups, lights) {
+        if (this.fullUpdateCallback) {
+            this.fullUpdateCallback(groups, lights);
+        }
+
+        this.processGroupsUpdate(groups);
+    }
+
+    handleGroupUpdate(msg) {
+        var id = msg['id'];
+        var group = msg;
+        if (this.groupCallbacks[id]) {
+            this.groupCallbacks[id](group);
+        }
+    }
+
+    handleEvent(msg) {
+        if (msg.id == 'HUE') {
+            this.processFullUpdate(msg.data['groups'], msg.data['lights']);
+        }
+    }
+}
+
+// Used by the React components to listen for event updates.
+var lbe = new LightsBackend(socket);
+
 class LightGroup extends React.Component {
     constructor(props) {
         super(props);
@@ -30,11 +93,9 @@ class LightGroup extends React.Component {
         this.state = {isOn: isOn, myId: myId, name: name, color: color};
 
         this.handleClick = this.handleClick.bind(this);
-        this.handleMainEvent = this.handleMainEvent.bind(this);
         this.handleGroupUpdate = this.handleGroupUpdate.bind(this);
-        socket.on('group_update', this.handleGroupUpdate)
 
-        props.groupCallbackFn(this.state.myId, this.handleMainEvent);
+        lbe.registerGroupCallback(this.state.myId, this.handleGroupUpdate);
    }
 
     handleClick() {
@@ -44,55 +105,28 @@ class LightGroup extends React.Component {
         socket.emit('group_click', {id: myId, on: wantState});
     }
 
-    handleMainEvent(group) {
+    handleGroupUpdate(group) {
         var {isOn, myId, name, color} = this.state;
-        
-        if (group.id == myId) {
-            name = group.name;
-            color = group.action.color;
-            var anyon = (group.state.any_on == true);
-            var allon = (group.state.all_on == true);
 
-            // Assume on, check just below.
-            isOn = true;
+        name = group.name;
+        color = group.action.color;
+        var anyon = (msg.state.any_on == true);
+        var allon = (msg.state.all_on == true);
 
-            // If we are partially on, add some **.
-            if (!allon && anyon) {
-                name = name + '**';
-            }
+        // Assume on, check just below.
+        isOn = true;
 
-            // If we are not on, set to grey.
-            if (!anyon) {
-                isOn = false;
-            }
-
-            this.setState({isOn, myId, name, color});
+        // If we are partially on, add some **.
+        if (!allon && anyon) {
+            name = name + '**';
         }
-    }
 
-    handleGroupUpdate(msg) {
-        var {isOn, myId, name, color} = this.state;
-        if (msg.id == myId) {
-            name = msg.name;
-            color = msg.action.color;
-            var anyon = (msg.state.any_on == true);
-            var allon = (msg.state.all_on == true);
-
-            // Assume on, check just below.
-            isOn = true;
-
-            // If we are partially on, add some **.
-            if (!allon && anyon) {
-                name = name + '**';
-            }
-
-            // If we are not on, set to grey.
-            if (!anyon) {
-                isOn = false;
-            }
-
-            this.setState({isOn, myId, name, color});
+        // If we are not on, set to grey.
+        if (!anyon) {
+            isOn = false;
         }
+
+        this.setState({isOn, myId, name, color});
     }
 
     render() {
@@ -116,7 +150,7 @@ class LightGroup extends React.Component {
 
 var LightGroupList = React.createClass( {
     render() {
-        var {groups, lights, groupCallbackFn} = this.props;
+        var {groups, lights} = this.props;
 
         return (
             <div style={{width:'150px'}} className='light_group_list'>
@@ -125,7 +159,7 @@ var LightGroupList = React.createClass( {
 
                     groups.map(function(group, lights){
                         return (
-                            <LightGroup groupCallbackFn={groupCallbackFn} key={group.id} group={group} lights={lights} />
+                            <LightGroup key={group.id} group={group} lights={lights} />
                         );
                     })
                 }
@@ -135,52 +169,30 @@ var LightGroupList = React.createClass( {
 } );
 
 
-var Lights = React.createClass( {
-    getInitialState() {
-        return {groups: null, lights: null, groupCallbacks: {}};
-    },
+class Lights extends React.Component {
+    constructor(props) {
+        super(props);
 
-    componentDidMount() {
-        socket.on('connect', this._connected);
-        socket.on('event', this._handleEvent);
-        socket.on('disconnect', this._disconnected);
-    },
+        this.handleFullUpdate = this.handleFullUpdate.bind(this);
+        lbe.registerFullUpdateCallback(this.handleFullUpdate);
 
-    _connected() {
-        console.log("Connected to lights backend!");
-    },
+        this.state = {groups: null, lights: null};
+    }
 
-    _disconnected() {
-        console.log("Disconnected from lights backend!");
-    },
+    handleFullUpdate(groups, lights) {
+        var {groups, lights} = this.state;
 
-    _handleEvent(msg) {
-        if (msg.id == 'HUE') {
-            var {groups, lights, groupCallbacks} = this.state;
+        groups = groups;
+        lights = lights;
 
-            groups = msg.data['groups'];
-            lights = msg.data['lights'];
-
-            for (let group of groups) {
-                if (groupCallbacks[group.id]) {
-                    groupCallbacks[group.id](group);
-                }
-            }
-
-            this.setState({groups, lights, groupCallbacks});
-       }
-    },
-
-    groupChildRegisterForUpdates(id, callback) {
-        this.state.groupCallbacks[id] = callback;
-    },
+        this.setState({groups, lights});
+    }
 
     render() {
         if (null != this.state.groups) {
             return (
                 <div>
                     <LightGroupList
-                        groupCallbackFn={this.groupChildRegisterForUpdates}
                         groups={this.state.groups}
                         lights={this.state.lights}
                     />
@@ -191,6 +203,6 @@ var Lights = React.createClass( {
             return <h4>Waiting for lighting update...</h4>
         }
     }
-} );
+}
 
 export default Lights;
