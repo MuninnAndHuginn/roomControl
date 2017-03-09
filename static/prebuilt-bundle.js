@@ -166,7 +166,83 @@
 	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 	// Connect to the lights namespace of the backend.
-	var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/lights');
+	var light_socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + '/lights');
+
+	$.LightsBackend = {
+	    groupCallbacks: {},
+	    fullUpdateCallback: null
+	};
+
+	$.LightsBackend.connected = function () {
+	    console.log("Connected to lights backend!");
+	};
+
+	$.LightsBackend.disconnected = function () {
+	    console.log("Disconnected from lights backend!");
+	};
+
+	$.LightsBackend.registerGroupCallback = function (id, fn) {
+	    $.LightsBackend.groupCallbacks[id] = fn;
+	};
+
+	$.LightsBackend.registerFullUpdateCallback = function (fn) {
+	    $.LightsBackend.fullUpdateCallback = fn;
+	};
+
+	$.LightsBackend.processGroupsUpdate = function (groups) {
+	    var _iteratorNormalCompletion = true;
+	    var _didIteratorError = false;
+	    var _iteratorError = undefined;
+
+	    try {
+	        for (var _iterator = groups[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+	            var group = _step.value;
+
+	            if ($.LightsBackend.groupCallbacks[group.id]) {
+	                $.LightsBackend.groupCallbacks[group.id](group);
+	            }
+	        }
+	    } catch (err) {
+	        _didIteratorError = true;
+	        _iteratorError = err;
+	    } finally {
+	        try {
+	            if (!_iteratorNormalCompletion && _iterator.return) {
+	                _iterator.return();
+	            }
+	        } finally {
+	            if (_didIteratorError) {
+	                throw _iteratorError;
+	            }
+	        }
+	    }
+	};
+
+	$.LightsBackend.processFullUpdate = function (groups, lights) {
+	    if ($.LightsBackend.fullUpdateCallback) {
+	        $.LightsBackend.fullUpdateCallback(groups, lights);
+	    }
+	    $.LightsBackend.processGroupsUpdate(groups);
+	};
+
+	$.LightsBackend.handleGroupUpdate = function (msg) {
+	    var id = msg['id'];
+	    var group = msg;
+	    if ($.LightsBackend.groupCallbacks[id]) {
+	        $.LightsBackend.groupCallbacks[id](group);
+	    }
+	};
+
+	$.LightsBackend.handleEvent = function (msg) {
+	    if (msg.id == 'HUE') {
+	        $.LightsBackend.processFullUpdate(msg.data['groups'], msg.data['lights']);
+	    }
+	};
+
+	light_socket.on('group_update', $.LightsBackend.handleGroupUpdate);
+	light_socket.on('event', $.LightsBackend.handleEvent);
+	light_socket.on('connect', $.LightsBackend.connected);
+	light_socket.on('disconnect', $.LightsBackend.disconnected);
 
 	var LightGroup = function (_React$Component) {
 	    _inherits(LightGroup, _React$Component);
@@ -203,11 +279,9 @@
 	        _this.state = { isOn: isOn, myId: myId, name: name, color: color };
 
 	        _this.handleClick = _this.handleClick.bind(_this);
-	        _this.handleMainEvent = _this.handleMainEvent.bind(_this);
 	        _this.handleGroupUpdate = _this.handleGroupUpdate.bind(_this);
-	        socket.on('group_update', _this.handleGroupUpdate);
 
-	        props.groupCallbackFn(_this.state.myId, _this.handleMainEvent);
+	        $.LightsBackend.registerGroupCallback(_this.state.myId, _this.handleGroupUpdate);
 	        return _this;
 	    }
 
@@ -217,11 +291,11 @@
 	            // Send the opposite of the current on state.
 	            var wantState = !this.state.isOn;
 	            var myId = this.state.myId;
-	            socket.emit('group_click', { id: myId, on: wantState });
+	            light_socket.emit('group_click', { id: myId, on: wantState });
 	        }
 	    }, {
-	        key: 'handleMainEvent',
-	        value: function handleMainEvent(group) {
+	        key: 'handleGroupUpdate',
+	        value: function handleGroupUpdate(group) {
 	            var _state = this.state,
 	                isOn = _state.isOn,
 	                myId = _state.myId,
@@ -229,67 +303,34 @@
 	                color = _state.color;
 
 
-	            if (group.id == myId) {
-	                name = group.name;
-	                color = group.action.color;
-	                var anyon = group.state.any_on == true;
-	                var allon = group.state.all_on == true;
+	            name = group.name;
+	            color = group.action.color;
+	            var anyon = group.state.any_on == true;
+	            var allon = group.state.all_on == true;
 
-	                // Assume on, check just below.
-	                isOn = true;
+	            // Assume on, check just below.
+	            isOn = true;
 
-	                // If we are partially on, add some **.
-	                if (!allon && anyon) {
-	                    name = name + '**';
-	                }
-
-	                // If we are not on, set to grey.
-	                if (!anyon) {
-	                    isOn = false;
-	                }
-
-	                this.setState({ isOn: isOn, myId: myId, name: name, color: color });
+	            // If we are partially on, add some **.
+	            if (!allon && anyon) {
+	                name = name + '**';
 	            }
+
+	            // If we are not on, set to grey.
+	            if (!anyon) {
+	                isOn = false;
+	            }
+
+	            this.setState({ isOn: isOn, myId: myId, name: name, color: color });
 	        }
 	    }, {
-	        key: 'handleGroupUpdate',
-	        value: function handleGroupUpdate(msg) {
+	        key: 'render',
+	        value: function render() {
 	            var _state2 = this.state,
 	                isOn = _state2.isOn,
 	                myId = _state2.myId,
 	                name = _state2.name,
 	                color = _state2.color;
-
-	            if (msg.id == myId) {
-	                name = msg.name;
-	                color = msg.action.color;
-	                var anyon = msg.state.any_on == true;
-	                var allon = msg.state.all_on == true;
-
-	                // Assume on, check just below.
-	                isOn = true;
-
-	                // If we are partially on, add some **.
-	                if (!allon && anyon) {
-	                    name = name + '**';
-	                }
-
-	                // If we are not on, set to grey.
-	                if (!anyon) {
-	                    isOn = false;
-	                }
-
-	                this.setState({ isOn: isOn, myId: myId, name: name, color: color });
-	            }
-	        }
-	    }, {
-	        key: 'render',
-	        value: function render() {
-	            var _state3 = this.state,
-	                isOn = _state3.isOn,
-	                myId = _state3.myId,
-	                name = _state3.name,
-	                color = _state3.color;
 
 
 	            var setColor = "#" + color;
@@ -320,8 +361,7 @@
 	    render: function render() {
 	        var _props = this.props,
 	            groups = _props.groups,
-	            lights = _props.lights,
-	            groupCallbackFn = _props.groupCallbackFn;
+	            lights = _props.lights;
 
 
 	        return _react2.default.createElement(
@@ -333,92 +373,64 @@
 	                'Light Groups'
 	            ),
 	            groups.map(function (group, lights) {
-	                return _react2.default.createElement(LightGroup, { groupCallbackFn: groupCallbackFn, key: group.id, group: group, lights: lights });
+	                return _react2.default.createElement(LightGroup, { key: group.id, group: group, lights: lights });
 	            })
 	        );
 	    }
 	});
 
-	var Lights = _react2.default.createClass({
-	    displayName: 'Lights',
-	    getInitialState: function getInitialState() {
-	        return { groups: null, lights: null, groupCallbacks: {} };
-	    },
-	    componentDidMount: function componentDidMount() {
-	        socket.on('connect', this._connected);
-	        socket.on('event', this._handleEvent);
-	        socket.on('disconnect', this._disconnected);
-	    },
-	    _connected: function _connected() {
-	        console.log("Connected to lights backend!");
-	    },
-	    _disconnected: function _disconnected() {
-	        console.log("Disconnected from lights backend!");
-	    },
-	    _handleEvent: function _handleEvent(msg) {
-	        if (msg.id == 'HUE') {
-	            var _state4 = this.state,
-	                groups = _state4.groups,
-	                lights = _state4.lights,
-	                groupCallbacks = _state4.groupCallbacks;
+	var Lights = function (_React$Component2) {
+	    _inherits(Lights, _React$Component2);
 
+	    function Lights(props) {
+	        _classCallCheck(this, Lights);
 
-	            groups = msg.data['groups'];
-	            lights = msg.data['lights'];
+	        var _this2 = _possibleConstructorReturn(this, (Lights.__proto__ || Object.getPrototypeOf(Lights)).call(this, props));
 
-	            var _iteratorNormalCompletion = true;
-	            var _didIteratorError = false;
-	            var _iteratorError = undefined;
+	        _this2.handleFullUpdate = _this2.handleFullUpdate.bind(_this2);
+	        $.LightsBackend.registerFullUpdateCallback(_this2.handleFullUpdate);
 
-	            try {
-	                for (var _iterator = groups[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-	                    var group = _step.value;
-
-	                    if (groupCallbacks[group.id]) {
-	                        groupCallbacks[group.id](group);
-	                    }
-	                }
-	            } catch (err) {
-	                _didIteratorError = true;
-	                _iteratorError = err;
-	            } finally {
-	                try {
-	                    if (!_iteratorNormalCompletion && _iterator.return) {
-	                        _iterator.return();
-	                    }
-	                } finally {
-	                    if (_didIteratorError) {
-	                        throw _iteratorError;
-	                    }
-	                }
-	            }
-
-	            this.setState({ groups: groups, lights: lights, groupCallbacks: groupCallbacks });
-	        }
-	    },
-	    groupChildRegisterForUpdates: function groupChildRegisterForUpdates(id, callback) {
-	        this.state.groupCallbacks[id] = callback;
-	    },
-	    render: function render() {
-	        if (null != this.state.groups) {
-	            return _react2.default.createElement(
-	                'div',
-	                null,
-	                _react2.default.createElement(LightGroupList, {
-	                    groupCallbackFn: this.groupChildRegisterForUpdates,
-	                    groups: this.state.groups,
-	                    lights: this.state.lights
-	                })
-	            );
-	        } else {
-	            return _react2.default.createElement(
-	                'h4',
-	                null,
-	                'Waiting for lighting update...'
-	            );
-	        }
+	        _this2.state = { groups: null, lights: null };
+	        return _this2;
 	    }
-	});
+
+	    _createClass(Lights, [{
+	        key: 'handleFullUpdate',
+	        value: function handleFullUpdate(_groups, _lights) {
+	            var _state3 = this.state,
+	                groups = _state3.groups,
+	                lights = _state3.lights;
+
+
+	            groups = _groups;
+	            lights = _lights;
+
+	            this.setState({ groups: groups, lights: lights });
+	        }
+	    }, {
+	        key: 'render',
+	        value: function render() {
+	            if (null != this.state.groups) {
+	                return _react2.default.createElement(
+	                    'div',
+	                    null,
+	                    _react2.default.createElement(LightGroupList, {
+	                        groups: this.state.groups,
+	                        lights: this.state.lights
+	                    })
+	                );
+	            } else {
+	                return _react2.default.createElement(
+	                    'h4',
+	                    null,
+	                    'Waiting for lighting update...'
+	                );
+	            }
+	        }
+	    }]);
+
+	    return Lights;
+	}(_react2.default.Component);
 
 	exports.default = Lights;
 
