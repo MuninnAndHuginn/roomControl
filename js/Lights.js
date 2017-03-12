@@ -126,15 +126,19 @@ class LightGroup extends React.Component {
 
         var setColor = "#" + color;
         var decorate = 'none';
+	var bgColor = "#FFFFFF";
+	var tColor = "#000000";
+	var border = "2px";
 
         if (!isOn) {
-            setColor = "#D3D3D3";
-            decorate = 'line-through';
+            bgColor = "#D3D3D3";
+            tColor = "#FFFFFF";
+	    border = "none"
         }
         
         return (
-            <div style={{backgroundColor: setColor}} onClick={this.handleClick} className='light_group'>
-                <span style={{textDecoration: decorate}}>{ name }</span>
+            <div style={{backgroundColor: bgColor}} onClick={this.handleClick} className='light_group'>
+                <span style={{textColor: tColor, border: border}}>{ name }</span>
             </div>
         );
     }
