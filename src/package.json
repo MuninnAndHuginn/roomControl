@@ -1,0 +1,19 @@
+{
+  "name": "room_control",
+  "version": "1.0.0",
+  "description": "Node application to monitor sensor and backend data for changes and apply actions as necessary. Also provides an API for managing the related backends.",
+  "main": "index.js",
+  "scripts": {
+    "start": "./node_modules/nodemon/bin/nodemon.js ./src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "boom": "^7.3.0",
+    "fastify": "^1.13.3",
+    "node-hue-api": "^2.4.4",
+    "nodemon": "^1.18.9",
+    "schm": "^0.4.1"
+  }
+}
