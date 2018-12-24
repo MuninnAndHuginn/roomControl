@@ -50,7 +50,7 @@ function getAllLights() {
             console.log("Return getAllLights: " + values)
             return values
         })
-	})
+    })
 }
 
 // Get all lights
